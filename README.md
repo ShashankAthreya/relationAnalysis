@@ -18,3 +18,4 @@ Linear Regression R-squared:  -2.4041122675067377
 
 
 Best parameters:  {'activation': 'tanh', 'alpha': 0.01, 'hidden_layer_sizes': (50,), 'learning_rate_init': 0.001}
+ 
