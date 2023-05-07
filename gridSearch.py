@@ -23,29 +23,47 @@ end_date = min(slpa_data.time.max(), ssta_data.time.max())
 slpa_data = slpa_data.sel(time=slice(start_date, end_date))
 ssta_data = ssta_data.sel(time=slice(start_date, end_date))
 
-# Removing Duplicates Times
+print(slpa_data)
+print(ssta_data)
+
+# Remove duplicate time values
 slpa_data = slpa_data.sel(time=~slpa_data.indexes['time'].duplicated())
 ssta_data = ssta_data.sel(time=~ssta_data.indexes['time'].duplicated())
 
-# Missing Data Handling: Interpolate missing data using linear interpolation
-slpa_data = slpa_data.interpolate_na(dim="time", method="linear")
-ssta_data = ssta_data.interpolate_na(dim="time", method="linear")
+# Find the common time values
+common_times = np.intersect1d(slpa_data['time'], ssta_data['time'])
 
-# Temporal Averaging: Calculate 3-month moving averages to reduce noise
-slpa_data = slpa_data.rolling(time=3, center=True).mean()
-ssta_data = ssta_data.rolling(time=3, center=True).mean()
+# Select common time values
+slpa_data = slpa_data.sel(time=common_times)
+ssta_data = ssta_data.sel(time=common_times)
 
-# Standardization and Flattening: Convert the data to numpy arrays and flatten the data
-slpa_np = slpa_data["SLPA"].values
-ssta_np = ssta_data["SSTA"].values
+# Interpolate missing values using the nearest neighbor method
+slpa_data = slpa_data.interpolate_na(dim='time', method='nearest')
+ssta_data = ssta_data.interpolate_na(dim='time', method='nearest')
+
+# Fill missing values in SSTA data with mean value
+ssta_data = ssta_data.fillna(ssta_data['ssta'].mean())
+
+# Get the numpy arrays from the xarray DataArrays
+slpa_np = slpa_data["slpa"].values
+ssta_np = ssta_data["ssta"].values
+
+# Calculate the percentage of missing values in both datasets
+slpa_missing = np.isnan(slpa_np).sum() / slpa_np.size
+ssta_missing = np.isnan(ssta_np).sum() / ssta_np.size
+
+print(f"Percentage of missing values in SLPA data: {slpa_missing * 100:.2f}%")
+print(f"Percentage of missing values in SSTA data: {ssta_missing * 100:.2f}%")
+
+
+# Flatten the numpy arrays
 slpa_flat = slpa_np.reshape(slpa_np.shape[0], -1)
 ssta_flat = ssta_np.reshape(ssta_np.shape[0], -1)
 
-# Remove any remaining NaNs after temporal averaging (first and last values)
+# Drop rows with NaN values in both input and target variables
 valid_indices = np.logical_not(np.isnan(slpa_flat).any(axis=1) | np.isnan(ssta_flat).any(axis=1))
 slpa_flat = slpa_flat[valid_indices]
 ssta_flat = ssta_flat[valid_indices]
-
 # %%
 # Train-test Split: Divide the dataset into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(slpa_flat, ssta_flat, test_size=0.3, random_state=42)
